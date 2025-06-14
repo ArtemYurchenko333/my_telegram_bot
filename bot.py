@@ -35,23 +35,35 @@ def main() -> None:
 
     PORT = int(os.environ.get("PORT", "8080")) # Это внутренний порт для Render
 
-    # Render предоставляет EXTERNAL_HOSTNAME без порта (потому что он использует 443 по умолчанию)
     WEBHOOK_URL = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
 
     if WEBHOOK_URL:
+        # Логируем то, что получаем от Render
+        logger.info(f"RENDER_EXTERNAL_HOSTNAME received: {WEBHOOK_URL}")
+
+        # Убедимся, что в WEBHOOK_URL нет порта. Если есть, удалим его.
+        # Например, если WEBHOOK_URL стал 'my-bot.onrender.com:10000', мы это исправим.
+        if ':' in WEBHOOK_URL:
+            # Разделяем на домен и порт, берем только домен
+            domain_only = WEBHOOK_URL.split(':')[0]
+            logger.warning(f"Port detected in RENDER_EXTERNAL_HOSTNAME ({WEBHOOK_URL}). Using domain only: {domain_only}")
+            WEBHOOK_URL = domain_only
+
         # URL, который мы сообщаем Telegram API, должен быть HTTPS и не содержать порт
-        # Render сам перенаправит 443 на ваш PORT
         webhook_telegram_url = f"https://{WEBHOOK_URL}/{BOT_TOKEN}"
 
-        logger.info(f"Starting webhook on internal port {PORT} with path /{BOT_TOKEN}")
+        logger.info(f"Final webhook URL to set in Telegram: {webhook_telegram_url}")
+
+        logger.info(f"Starting webhook listener on internal port {PORT} with path /{BOT_TOKEN}")
         updater.start_webhook(
             listen="0.0.0.0",
             port=PORT,
             url_path=BOT_TOKEN
         )
 
-        logger.info(f"Setting Telegram webhook to: {webhook_telegram_url}")
-        updater.bot.set_webhook(webhook_telegram_url) # Здесь не должно быть порта
+        # Устанавливаем webhook
+        updater.bot.set_webhook(webhook_telegram_url)
+        logger.info(f"Webhook set successfully to {webhook_telegram_url}")
     else:
         logger.info("RENDER_EXTERNAL_HOSTNAME not found, running with polling (for local testing).")
         updater.start_polling()
