@@ -49,10 +49,11 @@ def main() -> None:
         # Устанавливаем webhook
         # url_path для webhook в 13.x версии должен быть пустым или '/'
         # Полный URL для webhook
-        webhook_url_with_token = f"https://{WEBHOOK_URL}/{BOT_TOKEN}" # Используем токен как путь
+        webhook_url_with_token = f"https://{WEBHOOK_URL}/{BOT_TOKEN}" # Render автоматически обрабатывает 443 порт
+
         updater.start_webhook(
             listen="0.0.0.0",
-            port=PORT,
+            port=PORT, # Этот PORT - внутренний порт Render для вашего приложения
             url_path=BOT_TOKEN # Path for webhook, usually token
         )
         updater.bot.set_webhook(webhook_url_with_token) # Отдельно устанавливаем webhook
