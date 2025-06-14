@@ -1,5 +1,6 @@
 import os
 import logging
+import time # Добавляем импорт time
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
@@ -38,37 +39,43 @@ def main() -> None:
     WEBHOOK_URL = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
 
     if WEBHOOK_URL:
-        # Логируем то, что получаем от Render
         logger.info(f"RENDER_EXTERNAL_HOSTNAME received: {WEBHOOK_URL}")
 
-        # Убедимся, что в WEBHOOK_URL нет порта. Если есть, удалим его.
-        # Например, если WEBHOOK_URL стал 'my-bot.onrender.com:10000', мы это исправим.
         if ':' in WEBHOOK_URL:
-            # Разделяем на домен и порт, берем только домен
             domain_only = WEBHOOK_URL.split(':')[0]
             logger.warning(f"Port detected in RENDER_EXTERNAL_HOSTNAME ({WEBHOOK_URL}). Using domain only: {domain_only}")
             WEBHOOK_URL = domain_only
 
-        # URL, который мы сообщаем Telegram API, должен быть HTTPS и не содержать порт
         webhook_telegram_url = f"https://{WEBHOOK_URL}/{BOT_TOKEN}"
 
         logger.info(f"Final webhook URL to set in Telegram: {webhook_telegram_url}")
+        logger.info(f"Attempting to start webhook listener on internal port {PORT} with path /{BOT_TOKEN}")
 
-        logger.info(f"Starting webhook listener on internal port {PORT} with path /{BOT_TOKEN}")
-        updater.start_webhook(
-            listen="0.0.0.0",
-            port=PORT,
-            url_path=BOT_TOKEN
-        )
+        try:
+            updater.start_webhook(
+                listen="0.0.0.0",
+                port=PORT,
+                url_path=BOT_TOKEN
+            )
+            logger.info(f"Webhook listener started on port {PORT}.")
+            # Даем серверу немного времени на старт
+            time.sleep(1)
+            
+            logger.info(f"Setting Telegram webhook to: {webhook_telegram_url}")
+            updater.bot.set_webhook(webhook_telegram_url)
+            logger.info(f"Webhook set successfully to {webhook_telegram_url}")
 
-        # Устанавливаем webhook
-        updater.bot.set_webhook(webhook_telegram_url)
-        logger.info(f"Webhook set successfully to {webhook_telegram_url}")
+        except Exception as e:
+            logger.error(f"Error during webhook setup: {e}")
+            # Добавим задержку, чтобы можно было увидеть ошибку перед выходом
+            time.sleep(5)
+            raise # Перевыбрасываем ошибку, чтобы Render её увидел
     else:
         logger.info("RENDER_EXTERNAL_HOSTNAME not found, running with polling (for local testing).")
         updater.start_polling()
 
-    updater.idle()
+    logger.info("Bot is now idling. Waiting for updates.")
+    updater.idle() # Этот метод блокирует выполнение и держит бота активным
 
 if __name__ == "__main__":
     main()
